@@ -12,6 +12,7 @@ Build the components at the build of a registry.
 
 import odoo
 from odoo import models
+from odoo.modules.module_graph import ModuleGraph
 
 from .core import DEFAULT_CACHE_SIZE, ComponentRegistry, _component_databases
 
@@ -63,9 +64,8 @@ class ComponentBuilder(models.AbstractModel):
         # lookup all the installed (or about to be) addons and generate
         # the graph, so we can load the components following the order
         # of the addons' dependencies
-        graph = odoo.modules.graph.Graph()
-        graph.add_module(self.env.cr, "base")
-
+        graph = ModuleGraph(self.env.cr)
+        
         query = "SELECT name " "FROM ir_module_module " "WHERE state IN %s "
         params = [tuple(states)]
         if exclude_addons:
@@ -74,7 +74,8 @@ class ComponentBuilder(models.AbstractModel):
         self.env.cr.execute(query, params)
 
         module_list = [name for (name,) in self.env.cr.fetchall() if name not in graph]
-        graph.add_modules(self.env.cr, module_list)
+        # Add base module and all other modules
+        graph.extend(["base"] + module_list)
 
         for module in graph:
             self.load_components(module.name, components_registry=components_registry)
